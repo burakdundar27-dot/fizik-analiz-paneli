@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { notFound } from "next/navigation";
 import { FileQuestion, ListOrdered } from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -5,8 +6,35 @@ import { getCurrentUser, createClient } from "@/lib/supabase/server";
 import { getStudentWeakTopics } from "@/lib/actions/analysis-actions";
 import { TeacherQuestionCard } from "@/components/teacher/QuestionDetailDrawer";
 import { STORAGE_BUCKET } from "@/lib/constants";
+import { cn } from "@/lib/utils";
 
 export const metadata = { title: "Öğrenci Detayı — Fizik Analiz Paneli" };
+
+const PERIOD_TABS = [
+  { key: "all", label: "Genel (Tüm Zamanlar)" },
+  { key: "month", label: "Bu Ay (Son 30 Gün)" },
+] as const;
+
+type Period = (typeof PERIOD_TABS)[number]["key"];
+
+function PeriodTabs({ current }: { current: Period }) {
+  return (
+    <div className="inline-flex gap-1 self-start rounded-lg border bg-muted p-1 text-sm">
+      {PERIOD_TABS.map((tab) => (
+        <Link
+          key={tab.key}
+          href={tab.key === "all" ? "?" : `?period=${tab.key}`}
+          className={cn(
+            "rounded-md px-3 py-1.5 font-medium transition-colors",
+            current === tab.key ? "bg-card shadow-sm" : "text-muted-foreground hover:text-foreground"
+          )}
+        >
+          {tab.label}
+        </Link>
+      ))}
+    </div>
+  );
+}
 
 async function getStudentQuestions(studentId: string) {
   const supabase = await createClient();
@@ -33,8 +61,15 @@ async function getStudentQuestions(studentId: string) {
   }));
 }
 
-export default async function StudentDetailPage({ params }: { params: Promise<{ id: string }> }) {
-  const { id } = await params;
+export default async function StudentDetailPage({
+  params,
+  searchParams,
+}: {
+  params: Promise<{ id: string }>;
+  searchParams: Promise<{ period?: string }>;
+}) {
+  const [{ id }, sp] = await Promise.all([params, searchParams]);
+  const period: Period = sp.period === "month" ? "month" : "all";
   const supabase = await createClient();
 
   const [user, { data: student }] = await Promise.all([
@@ -45,7 +80,7 @@ export default async function StudentDetailPage({ params }: { params: Promise<{ 
 
   const [questions, weakTopics] = await Promise.all([
     getStudentQuestions(student.id),
-    getStudentWeakTopics(student.id),
+    getStudentWeakTopics(student.id, period === "month" ? 30 : undefined),
   ]);
 
   return (
@@ -59,12 +94,19 @@ export default async function StudentDetailPage({ params }: { params: Promise<{ 
       </div>
 
       <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2 text-lg">
-            <ListOrdered className="size-5 text-primary" />
-            En Çok Yanlış Yapılan Konular
-          </CardTitle>
-          <CardDescription>En sık tekrarlanan eksikler, en çoktan aza sıralı.</CardDescription>
+        <CardHeader className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+          <div>
+            <CardTitle className="flex items-center gap-2 text-lg">
+              <ListOrdered className="size-5 text-primary" />
+              En Çok Yanlış Yapılan Konular
+            </CardTitle>
+            <CardDescription>
+              {period === "month"
+                ? "Son 30 gün içinde en sık tekrarlanan eksikler."
+                : "Tüm zamanların en sık tekrarlanan eksikleri."}
+            </CardDescription>
+          </div>
+          <PeriodTabs current={period} />
         </CardHeader>
         <CardContent>
           {weakTopics.length === 0 ? (

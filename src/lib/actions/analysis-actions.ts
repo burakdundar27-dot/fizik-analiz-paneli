@@ -125,11 +125,18 @@ export async function getStudentStats(studentId: string) {
   return computeStats(supabase, rows ?? []);
 }
 
-/** Öğrencinin konu (topic) bazında en çok yanlış yaptığı alanlar, azalan sırada. */
-export async function getStudentWeakTopics(studentId: string) {
+/** Öğrencinin konu (topic) bazında en çok yanlış yaptığı alanlar, azalan sırada.
+ *  `days` verilirse yalnız son N gün içinde yüklenen sorular sayılır. */
+export async function getStudentWeakTopics(studentId: string, days?: number) {
   const supabase = await createClient();
 
-  const { data: rows } = await supabase.from("questions").select("sub_outcome_id").eq("student_id", studentId);
+  let query = supabase.from("questions").select("sub_outcome_id").eq("student_id", studentId);
+  if (days) {
+    const since = new Date();
+    since.setDate(since.getDate() - days);
+    query = query.gte("created_at", since.toISOString());
+  }
+  const { data: rows } = await query;
   const questions = rows ?? [];
   if (questions.length === 0) return [];
 
