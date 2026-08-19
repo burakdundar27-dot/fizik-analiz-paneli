@@ -1,0 +1,29 @@
+node_modules/
+.next/
+out/
+build/
+next-env.d.ts
+
+# Ortam değişkenleri — ASLA commit edilmez
+.env
+.env.local
+.env*.local
+
+# Yerel sunucu logları
+dev.log
+dev.err.log
+
+# OS / editör
+.DS_Store
+Thumbs.db
+*.tsbuildinfo
+
+# Supabase yerel
+supabase/.temp/
+supabase/.branches/
+
+# Kaynak PDF'ler (büyük, build için gerekmiyor)
+veri/tyt-pdf/
+
+# Kişisel yerel izin ayarları
+.claude/settings.local.json

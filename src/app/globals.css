@@ -1,0 +1,28 @@
+@import "tailwindcss";
+
+/* Tema değişkenleri — özel CSS yalnız burada (brain §4.3). Vurgu: indigo. */
+@theme {
+  --color-background: oklch(1 0 0);
+  --color-foreground: oklch(0.21 0.006 285.9);
+  --color-card: oklch(1 0 0);
+  --color-muted: oklch(0.967 0.001 286.4);
+  --color-muted-foreground: oklch(0.552 0.016 285.9);
+  --color-border: oklch(0.92 0.004 286.3);
+  --color-primary: oklch(0.51 0.23 277);
+  --color-primary-foreground: oklch(0.985 0 0);
+  --color-destructive: oklch(0.577 0.245 27.3);
+  --radius: 0.75rem;
+  --font-sans: Inter, ui-sans-serif, system-ui, sans-serif;
+}
+
+@layer base {
+  * {
+    border-color: var(--color-border);
+  }
+  body {
+    background-color: var(--color-muted);
+    color: var(--color-foreground);
+    font-family: var(--font-sans);
+    -webkit-font-smoothing: antialiased;
+  }
+}
