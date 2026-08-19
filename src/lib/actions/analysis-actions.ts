@@ -97,18 +97,18 @@ async function computeStats(
   return { total: questions.length, topReason, weakestUnit, reasonDistribution, topSubOutcomes };
 }
 
-/** Öğretmenin kendi sınıflarındaki tüm kayıtların analizi. */
+/** Öğretmenin kendisine bağlı tüm öğrencilerinin kayıtlarının analizi. */
 export async function getDashboardStats(teacherId: string) {
   const supabase = await createClient();
 
-  const { data: classes } = await supabase.from("classes").select("id").eq("teacher_id", teacherId);
-  const classIds = (classes ?? []).map((c) => c.id);
-  if (classIds.length === 0) return emptyStats();
+  const { data: links } = await supabase.from("student_teacher").select("student_id").eq("teacher_id", teacherId);
+  const studentIds = (links ?? []).map((l) => l.student_id);
+  if (studentIds.length === 0) return emptyStats();
 
   const { data: rows } = await supabase
     .from("questions")
     .select("error_reason,sub_outcome_id")
-    .in("class_id", classIds);
+    .in("student_id", studentIds);
 
   return computeStats(supabase, rows ?? []);
 }
@@ -123,4 +123,43 @@ export async function getStudentStats(studentId: string) {
     .eq("student_id", studentId);
 
   return computeStats(supabase, rows ?? []);
+}
+
+/** Öğrencinin konu (topic) bazında en çok yanlış yaptığı alanlar, azalan sırada. */
+export async function getStudentWeakTopics(studentId: string) {
+  const supabase = await createClient();
+
+  const { data: rows } = await supabase.from("questions").select("sub_outcome_id").eq("student_id", studentId);
+  const questions = rows ?? [];
+  if (questions.length === 0) return [];
+
+  const subOutcomeIds = Array.from(new Set(questions.map((q) => q.sub_outcome_id)));
+  const { data: subOutcomes } = await supabase.from("sub_outcomes").select("id,outcome_id").in("id", subOutcomeIds);
+
+  const outcomeIds = Array.from(new Set((subOutcomes ?? []).map((s) => s.outcome_id)));
+  const { data: outcomes } = outcomeIds.length
+    ? await supabase.from("outcomes").select("id,topic_id").in("id", outcomeIds)
+    : { data: [] };
+
+  const topicIds = Array.from(new Set((outcomes ?? []).map((o) => o.topic_id)));
+  const { data: topics } = topicIds.length
+    ? await supabase.from("topics").select("id,title").in("id", topicIds)
+    : { data: [] };
+
+  const topicTitleById = new Map((topics ?? []).map((t) => [t.id, t.title]));
+  const topicIdByOutcomeId = new Map((outcomes ?? []).map((o) => [o.id, o.topic_id]));
+  const outcomeIdBySubOutcomeId = new Map((subOutcomes ?? []).map((s) => [s.id, s.outcome_id]));
+
+  const counts = new Map<string, number>();
+  for (const q of questions) {
+    const outcomeId = outcomeIdBySubOutcomeId.get(q.sub_outcome_id);
+    const topicId = outcomeId ? topicIdByOutcomeId.get(outcomeId) : undefined;
+    const title = topicId ? topicTitleById.get(topicId) : undefined;
+    if (!title) continue;
+    counts.set(title, (counts.get(title) ?? 0) + 1);
+  }
+
+  return Array.from(counts.entries())
+    .map(([title, count]) => ({ title, count }))
+    .sort((a, b) => b.count - a.count);
 }

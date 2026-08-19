@@ -27,3 +27,6 @@ veri/tyt-pdf/
 
 # Kişisel yerel izin ayarları
 .claude/settings.local.json
+
+.vercel
+.env*

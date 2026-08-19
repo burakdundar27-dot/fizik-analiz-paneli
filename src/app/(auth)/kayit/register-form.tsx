@@ -1,11 +1,11 @@
 "use client";
 
-import { useActionState, useState } from "react";
+import { useActionState } from "react";
 import { useFormStatus } from "react-dom";
 import { Loader2, CheckCircle2, AlertCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input, Label, Select } from "@/components/ui/input";
-import { GRADE_LEVELS, USER_ROLES, type UserRole } from "@/lib/constants";
+import { GRADE_LEVELS } from "@/lib/constants";
 import { signUp } from "../actions";
 import { cn } from "@/lib/utils";
 
@@ -21,7 +21,6 @@ function SubmitButton() {
 
 export function RegisterForm() {
   const [state, action] = useActionState(signUp, null);
-  const [role, setRole] = useState<UserRole>("student");
 
   // Kayıt başarılıysa formu gizle: kullanıcı e-postasını kontrol etmeli.
   if (state?.success) {
@@ -58,35 +57,19 @@ export function RegisterForm() {
         <p className="text-xs text-muted-foreground">En az 8 karakter.</p>
       </div>
 
+      <input type="hidden" name="role" value="student" />
+
       <div className="flex flex-col gap-2">
-        <Label htmlFor="role">Rol</Label>
-        <Select
-          id="role"
-          name="role"
-          value={role}
-          onChange={(e) => setRole(e.target.value as UserRole)}
-        >
-          {(Object.keys(USER_ROLES) as UserRole[]).map((r) => (
-            <option key={r} value={r}>
-              {USER_ROLES[r]}
+        <Label htmlFor="gradeLevel">Sınıf</Label>
+        <Select id="gradeLevel" name="gradeLevel" defaultValue="">
+          <option value="">Seç (isteğe bağlı)</option>
+          {GRADE_LEVELS.map((g) => (
+            <option key={g} value={g}>
+              {g}. sınıf
             </option>
           ))}
         </Select>
       </div>
-
-      {role === "student" && (
-        <div className="flex flex-col gap-2">
-          <Label htmlFor="gradeLevel">Sınıf</Label>
-          <Select id="gradeLevel" name="gradeLevel" defaultValue="">
-            <option value="">Seç (isteğe bağlı)</option>
-            {GRADE_LEVELS.map((g) => (
-              <option key={g} value={g}>
-                {g}. sınıf
-              </option>
-            ))}
-          </Select>
-        </div>
-      )}
 
       {state?.error && (
         <p

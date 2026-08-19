@@ -38,11 +38,8 @@ export async function createQuestion(_prev: ActionState, formData: FormData): Pr
     .upload(imagePath, image, { contentType: "image/webp" });
   if (uploadError) return { error: "Fotoğraf yüklenemedi, tekrar dene" };
 
-  const classId = (formData.get("classId") as string) || null;
-
   const insert: TablesInsert<"questions"> = {
     student_id: user.id,
-    class_id: classId,
     sub_outcome_id: subOutcomeId,
     image_path: imagePath,
     error_reason: errorReason,
@@ -81,10 +78,11 @@ export async function updateQuestionFeedback(_prev: ActionState, formData: FormD
     .from("questions")
     .update({ teacher_note: teacherNote || null })
     .eq("id", questionId)
-    .select("id");
+    .select("id,student_id");
 
   if (error || !data || data.length === 0) return { error: "Not kaydedilemedi, tekrar dene" };
 
   revalidatePath("/ogretmen");
+  revalidatePath(`/ogretmen/ogrenci/${data[0].student_id}`);
   return { success: "Not kaydedildi." };
 }

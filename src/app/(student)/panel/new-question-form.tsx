@@ -82,11 +82,9 @@ function BadgeGrid<T extends string>({
 export function NewQuestionForm({
   data,
   gradeLevel,
-  classId,
 }: {
   data: CurriculumData;
   gradeLevel?: number | null;
-  classId?: string | null;
 }) {
   const [state, formAction] = useActionState<ActionState, FormData>(createQuestion, null);
   const [subOutcomeId, setSubOutcomeId] = useState<string | null>(null);
@@ -113,7 +111,6 @@ export function NewQuestionForm({
 
   return (
     <form ref={formRef} onSubmit={handleSubmit} className="flex flex-col gap-4">
-      <input type="hidden" name="classId" value={classId ?? ""} />
       <ImageUploader onFileReady={setImage} onClear={() => setImage(null)} />
 
       <OutcomeSelect

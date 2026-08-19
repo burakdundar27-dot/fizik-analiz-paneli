@@ -43,7 +43,7 @@ export default async function AnalysisPage() {
     <div className="flex flex-col gap-4">
       <div>
         <h1 className="text-2xl font-semibold tracking-tight">Analiz</h1>
-        <p className="text-sm text-muted-foreground">Sınıflarının genel eksik haritası.</p>
+        <p className="text-sm text-muted-foreground">Öğrencilerinin genel eksik haritası.</p>
       </div>
 
       {stats.total === 0 ? (
@@ -57,7 +57,7 @@ export default async function AnalysisPage() {
           </CardHeader>
           <CardContent>
             <p className="text-sm text-muted-foreground">
-              Sınıflarına soru kaydı eklendiğinde burada özet ve grafik görünecek.
+              Öğrencilerin soru kaydı eklediğinde burada özet ve grafik görünecek.
             </p>
           </CardContent>
         </Card>
@@ -81,7 +81,7 @@ export default async function AnalysisPage() {
             <CardHeader className="flex flex-row items-center justify-between gap-2">
               <div>
                 <CardTitle className="text-lg">Hata nedeni dağılımı</CardTitle>
-                <CardDescription>Sınıflarındaki tüm kayıtlar.</CardDescription>
+                <CardDescription>Öğrencilerinin tüm kayıtları.</CardDescription>
               </div>
               <CsvExportButton data={stats.reasonDistribution} />
             </CardHeader>
@@ -97,7 +97,7 @@ export default async function AnalysisPage() {
           <Card>
             <CardHeader>
               <CardTitle className="text-lg">En çok hata yapılan alt kazanımlar</CardTitle>
-              <CardDescription>Sınıflarındaki en sık tekrarlanan eksikler.</CardDescription>
+              <CardDescription>Öğrencilerinde en sık tekrarlanan eksikler.</CardDescription>
             </CardHeader>
             <CardContent>
               <OutcomeAnalysisChart data={stats.topSubOutcomes} />

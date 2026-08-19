@@ -19,7 +19,8 @@ export const signUpSchema = z.object({
   email,
   password: z.string().min(8, "Şifre en az 8 karakter olmalı"),
   fullName: z.string().min(3, "Ad soyad en az 3 karakter olmalı").max(80),
-  role: z.enum(["student", "teacher"], { message: "Rol seç" }),
+  // Öğretmen kaydı formdan kapalı: tek öğretmen hesabı elle oluşturuldu.
+  role: z.literal("student", { message: "Şu an yalnız öğrenci kaydı açık" }),
   gradeLevel: z.coerce.number().int().min(9).max(12).optional(),
 });
 
@@ -58,17 +59,9 @@ export const createQuestionSchema = z.object({
 
 export type CreateQuestionInput = z.infer<typeof createQuestionSchema>;
 
-export const createClassSchema = z.object({
-  name: z.string().min(3, "Sınıf adı en az 3 karakter olmalı").max(60),
-  gradeLevel: z.coerce.number().int().min(9).max(12),
-});
+export const linkStudentSchema = z.object({ email });
 
-export const joinClassSchema = z.object({
-  joinCode: z.string().length(6, "Kod 6 karakter olmalı"),
-});
-
-export type CreateClassInput = z.infer<typeof createClassSchema>;
-export type JoinClassInput = z.infer<typeof joinClassSchema>;
+export type LinkStudentInput = z.infer<typeof linkStudentSchema>;
 
 export const updateQuestionFeedbackSchema = z.object({
   questionId: z.string().min(1, "Soru bulunamadı"),

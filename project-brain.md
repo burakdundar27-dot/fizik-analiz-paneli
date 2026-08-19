@@ -4,25 +4,28 @@
 > Her yeni oturumda Claude önce bu dosyayı okur, sonra kod yazar.
 > Kod ile bu dosya çelişirse **bu dosya kazanır**; kod düzeltilir veya dosya bilinçli olarak güncellenir.
 
-**Sürüm:** 0.2 · **Son güncelleme:** 2026-08-17 · **Durum:** Faz 1 tamam (kod tarafı) — Supabase projesi bekleniyor
+**Sürüm:** 0.5 · **Son güncelleme:** 2026-08-20 · **Durum:** Faz 1 ve Faz 4 tamam — sınıf yapısı `student_teacher` ilişki tablosuyla değiştirildi, Faz 2 (seed/manuel test) hâlâ açık
 
 ---
 
 ## 1. Projenin Amacı
 
-Ortaöğretim fizik dersinde öğrencinin **yanlış yaptığı soruyu fotoğraflayıp**, o sorunun hangi **alt kazanıma** ait olduğunu ve **neden yanlış yaptığını** işaretlediği; öğretmenin ise bu kayıtları **tarih ve hata nedeni** kırılımında görüp sınıfın gerçek eksiğini teşhis ettiği bir web paneli.
+Ortaöğretim fizik dersinde öğrencinin **yanlış yaptığı soruyu fotoğraflayıp**, o sorunun hangi **alt kazanıma** ait olduğunu ve **neden yanlış yaptığını** işaretlediği; öğretmenin ise bu kayıtları **tarih ve hata nedeni** kırılımında görüp öğrencinin gerçek eksiğini teşhis ettiği bir web paneli.
 
 **Çözdüğü problem:** "Öğrenci fizikten kötü" yerine → "Öğrencinin sorunu *Newton'un 2. yasasında vektörel toplama* değil, *serbest cisim diyagramı çizememe*; ve hata nedeni bilgi eksikliği değil, **işlem hatası**."
 
 ### Kullanıcı Rolleri
 | Rol | Ne yapar |
 |---|---|
-| `student` | Soru fotoğrafı yükler, alt kazanım seçer, hata nedeni + durum etiketi ekler, kendi geçmişini görür |
-| `teacher` | Kendi sınıflarındaki tüm kayıtları kart listesi olarak görür, filtreler, analiz eder, öğrenciye not düşer |
+| `student` | Soru fotoğrafı yükler, konusunu (alt kazanım) ve kendi hata sebebini (Eksik Bilgi, İşlem Hatası, Dikkat vb.) seçer, kendi geçmişini görür |
+| `teacher` | Öğrencilerini isim isim listede görür, bir öğrenciye tıklayınca yalnız o öğrencinin kronolojik soru kaydını ve "En Çok Yanlış Yapılan Konular" tablosunu görür, öğrenciye not düşer |
 
-### Kapsam Dışı (MVP'de YOK)
-- Otomatik soru çözümü / AI ile fotoğraftan soru okuma (OCR) → Faz 6+
-- Klasördeki `tyt_*.pdf` kitapçıklarının parse edilip soru havuzuna dönüşmesi → Faz 6+
+> ⚠️ **KESİN KURAL — Sınıf yapısı yoktur.** Uygulama sınıf/şube kavramı olmadan tamamen **özel ders odaklı**, öğretmen-öğrenci **isim bazlı** doğrudan ilişkisiyle çalışır. Sınıf oluşturma, `join_code` ile katılma gibi tüm mantık kaldırıldı — bkz. §3.2, §5 Faz 4, Karar #13.
+
+### Kapsam Dışı (kalıcı — MVP sonrasına ertelenen değil, tamamen YOK)
+- **AI / OCR tamamen devre dışı.** Otomatik soru çözümü, fotoğraftan soru okuma, OpenAI/Gemini gibi herhangi bir AI entegrasyonu **projede yer almaz** — Karar #14.
+- Klasördeki `tyt_*.pdf` kitapçıklarının parse edilip soru havuzuna dönüşmesi
+- Sınıf/şube yapısı, `join_code` ile katılma (yukarıya bkz.)
 - Mobil uygulama, veli girişi, mesajlaşma, ödeme
 
 ---
@@ -56,7 +59,7 @@ Ortaöğretim fizik dersinde öğrencinin **yanlış yaptığı soruyu fotoğraf
 │   ├── app/
 │   │   ├── (auth)/login/ · register/
 │   │   ├── (student)/panel/ · panel/yeni/ · panel/gecmis/
-│   │   ├── (teacher)/ogretmen/ · ogretmen/analiz/ · ogretmen/sinif/[id]/
+│   │   ├── (teacher)/ogretmen/ · ogretmen/analiz/ · ogretmen/ogrenci/[id]/
 │   │   ├── layout.tsx · page.tsx · globals.css
 │   ├── components/
 │   │   ├── ui/                 ← shadcn (elle DÜZENLENMEZ)
@@ -98,12 +101,19 @@ units (ünite)
 | `grade_level` | `smallint` | 9–12, öğrenci için |
 | `created_at` | `timestamptz` | default `now()` |
 
-### 3.2 `classes` / `class_members`
-Öğretmen–öğrenci bağı. Bir öğrenci birden fazla sınıfta olabilir.
+### 3.2 `student_teacher` — öğretmen-öğrenci ilişkisi
+`classes` / `class_members` tabloları **yoktur** (kalıcı olarak kaldırıldı, Karar #13). Yerine öğretmen-öğrenci bağını tutan ayrı bir ilişki tablosu var — `profiles.teacher_id` gibi tek kolonlu bir çözüm **değil**, bilinçli olarak ayrı tablo (Karar #15).
 
-**`classes`:** `id` uuid PK · `name` text (örn. "11-A Fizik") · `teacher_id` uuid → profiles · `join_code` text UNIQUE (6 hane, öğrenci bu kodla katılır) · `grade_level` smallint · `is_active` bool · `created_at`
+| Kolon | Tip | Not |
+|---|---|---|
+| `id` | `uuid` PK | `gen_random_uuid()` |
+| `teacher_id` | `uuid` NOT NULL | → profiles CASCADE |
+| `student_id` | `uuid` NOT NULL | → profiles CASCADE |
+| `created_at` | `timestamptz` | default `now()` |
 
-**`class_members`:** `id` uuid PK · `class_id` uuid → classes CASCADE · `student_id` uuid → profiles CASCADE · `joined_at` · **UNIQUE(class_id, student_id)**
+**UNIQUE(teacher_id, student_id)** — aynı bağ iki kez eklenmez.
+
+**Bağlama akışı:** Öğretmen panelinde öğrencinin e-postasını girer → `public.link_student_by_email(p_email)` (security definer RPC, `join_class_by_code`'un yerini alan desen) `auth.users`'ta e-postayı arar, `profiles.role = 'student'` olduğunu doğrular, `student_teacher` satırını ekler. Öğrenci tarafında herhangi bir kod/katılma adımı yoktur — bağlama tamamen öğretmen tarafından yapılır.
 
 ### 3.3 Kazanım Hiyerarşisi (referans tabloları — salt okunur)
 Hepsinde ortak: `id` uuid PK, `code` text UNIQUE, `title` text NOT NULL, `order_no` smallint, `created_at`.
@@ -122,7 +132,6 @@ Hepsinde ortak: `id` uuid PK, `code` text UNIQUE, `title` text NOT NULL, `order_
 |---|---|---|
 | `id` | `uuid` PK | `gen_random_uuid()` |
 | `student_id` | `uuid` NOT NULL | → profiles CASCADE |
-| `class_id` | `uuid` | → classes SET NULL (öğretmen filtresi için) |
 | `sub_outcome_id` | `uuid` NOT NULL | → sub_outcomes RESTRICT |
 | `image_path` | `text` NOT NULL | Storage yolu: `{student_id}/{uuid}.webp` — **tam URL değil** |
 | `error_reason` | `error_reason` NOT NULL | enum, aşağıda |
@@ -161,26 +170,29 @@ create type question_status as enum (
 ### 3.6 İndeksler
 ```sql
 create index on questions (student_id, created_at desc);
-create index on questions (class_id, created_at desc);
 create index on questions (sub_outcome_id);
 create index on questions (error_reason);
-create index on class_members (student_id);
+create index on student_teacher (teacher_id);
+create index on student_teacher (student_id);
 ```
 
 ### 3.7 RLS Politikaları (kritik)
 **Tüm tablolarda RLS AÇIK.** Yetki kontrolü uygulamada değil **veritabanında** yapılır.
 
-- `profiles`: herkes kendi satırını okur/günceller. Öğretmen, kendi sınıfındaki öğrencilerin profilini okur.
+- `profiles`: herkes kendi satırını okur/günceller. Öğretmen, `student_teacher` üzerinden kendisine bağlı öğrenci profillerini okur (`is_teacher_of`).
 - `units`/`topics`/`outcomes`/`sub_outcomes`: **giriş yapmış herkes SELECT**. INSERT/UPDATE/DELETE yok (seed `service_role` ile).
+- `student_teacher`:
+  - `SELECT`: `teacher_id = auth.uid()` **VEYA** `student_id = auth.uid()` (her iki taraf da kendi bağını görür).
+  - `INSERT`: yalnız `teacher_id = auth.uid()` ve `my_role() = 'teacher'` — pratikte yalnız `link_student_by_email` RPC'siyle yazılır.
+  - `DELETE`: yalnız `teacher_id = auth.uid()`.
 - `questions`:
-  - `SELECT`: `student_id = auth.uid()` **VEYA** kayıt, isteği yapan öğretmenin sınıflarından birine ait.
+  - `SELECT`: `student_id = auth.uid()` **VEYA** kaydın sahibi öğrencinin `student_teacher`'da bu öğretmene bağlı olması (`is_teacher_of`).
   - `INSERT`: yalnız `student_id = auth.uid()`.
   - `UPDATE`: öğrenci kendi kaydını (`teacher_note` HARİÇ); öğretmen yalnız `teacher_note`.
   - `DELETE`: yalnız kaydın sahibi öğrenci.
-- `classes`: öğretmen kendi sınıflarını yönetir; öğrenci üyesi olduğu sınıfı okur.
-- **Storage `question-images`**: private bucket. Yükleme yolu `{auth.uid()}/...` ile başlamak zorunda. Okuma: sahibi + sınıf öğretmeni. Görsel `createSignedUrl` ile gösterilir.
+- **Storage `question-images`**: private bucket. Yükleme yolu `{auth.uid()}/...` ile başlamak zorunda. Okuma: sahibi + `student_teacher` ile bağlı öğretmen. Görsel `createSignedUrl` ile gösterilir.
 
-> 🔒 Sonsuz döngü tuzağı: `questions` politikası içinde `profiles`'a bakan sorgu, `profiles` politikası da `questions`'a bakarsa recursion olur. Rol/sınıf kontrolleri `security definer` fonksiyonlarla yapılacak: `public.is_teacher_of(student uuid)`, `public.my_role()`.
+> 🔒 Sonsuz döngü tuzağı: `questions` politikası içinde `profiles`'a bakan sorgu, `profiles` politikası da `questions`'a bakarsa recursion olur. Rol/öğretmen kontrolleri `security definer` fonksiyonlarla yapılır: `public.is_teacher_of(student uuid)` (artık `class_members`/`classes` değil `student_teacher` üzerinden kontrol eder), `public.my_role()`, `public.link_student_by_email(email)`.
 
 ---
 
@@ -257,16 +269,16 @@ Ayrıca **Faz 2'nin SQL ve auth kısmı da yazıldı**: 3 migration dosyası + g
 `ImageUploader` (kamera + sürükle-bırak, client-side sıkıştırma, önizleme) · `OutcomeSelect` (Ünite → Konu → Kazanım → Alt Kazanım kademeli, aranabilir) · hata nedeni + durum seçimi (rozet grid) · kaynak & not alanları · `createQuestion` Server Action · `/panel/gecmis` kendi kayıtları listesi.
 **Bitti sayılır:** öğrenci telefondan fotoğraf yükleyip etiketleyebiliyor, kaydı listede görüyor.
 
-### Faz 4 — Öğretmen Paneli
-Sınıf oluşturma + `join_code` ile öğrenci katılımı · kart grid'i (fotoğraf önizleme, öğrenci adı, alt kazanım, hata nedeni rozeti, tarih) · filtre çubuğu: tarih aralığı, hata nedeni, öğrenci, sınıf, ünite (URL state) · sıralama: yeni/eski · soru detay drawer'ı + `teacher_note` yazma.
-**Bitti sayılır:** öğretmen "son 7 günde kavram yanılgısı" filtresini uygulayıp kartları görüyor ve not düşüyor.
+### Faz 4 — Öğretmen Paneli ✅ *tamamlandı*
+`/ogretmen`: e-posta ile öğrenci bağlama formu (`link_student_by_email` RPC) + `student_teacher`'da kendine bağlı öğrenciler isim isim listelenir · `/ogretmen/ogrenci/[id]`: yalnız o öğrencinin sorusu fotoğrafları kronolojik listede, **"En Çok Yanlış Yapılan Konular"** tablosu (sunucuda `sub_outcome → outcome → topic` zincirinden aggregate edilip azalan sırada) · soru detay drawer'ı + `teacher_note` yazma.
+**Bitti:** öğretmen bir öğrenciyi e-postayla ekliyor, listeden seçip tüm sorularını kronolojik görüyor, en çok yanlış yaptığı konuları sıralı tablo olarak görüyor.
 
 ### Faz 5 — Analiz
 Özet kartlar (toplam kayıt, en sık hata nedeni, en zayıf ünite, çözüme kavuşma oranı) · hata nedeni dağılımı (bar) · ünite bazlı ısı haritası · zaman serisi (haftalık trend) · öğrenci karşılaştırma tablosu · CSV dışa aktarım.
-**Bitti sayılır:** öğretmen tek ekranda sınıfın en zayıf 3 alt kazanımını görüyor.
+**Bitti sayılır:** öğretmen tek ekranda tüm öğrencilerinin (toplu) en zayıf 3 alt kazanımını görüyor.
 
 ### Faz 6 — İyileştirme & Gelecek
-Boş/hata durumlarının cilalanması · performans (görsel lazy-load, signed URL cache) · Vercel deploy · **sonra:** `veri/tyt-pdf/` içindeki 2020–2026 TYT kitapçıklarından soru havuzu çıkarma, kazanım eşleme, ÖSYM trend analizi; OCR ile otomatik kazanım önerisi.
+Boş/hata durumlarının cilalanması · performans (görsel lazy-load, signed URL cache) · Vercel deploy · **sonra:** `veri/tyt-pdf/` içindeki 2020–2026 TYT kitapçıklarından soru havuzu çıkarma, kazanım eşleme, ÖSYM trend analizi. **AI/OCR ile otomatik kazanım önerisi kapsam dışı bırakıldı — bkz. §1 Kapsam Dışı, Karar #14.**
 
 ---
 
@@ -286,10 +298,16 @@ Boş/hata durumlarının cilalanması · performans (görsel lazy-load, signed U
 | 10 | Rol kontrolü layout'ta, proxy'de değil | Proxy her istekte çalışır; oradaki ek DB sorgusu her sayfa yüklemesine gecikme bindirir |
 | 11 | Magic link'te `shouldCreateUser: false` | Ad-soyad ve rol olmadan profil satırı anlamsız olur; kayıt akışı ayrı tutuldu |
 | 12 | `ui/` primitifleri elle, shadcn API'siyle | Faz 1'de Radix bağımlılığı gereksiz. Aynı `variant`/`size` isimleri kullanıldı → Faz 3'te `npx shadcn add` bu dosyaları güvenle ezebilir |
+| 13 | Sınıf yapısı (`classes`/`class_members`/`join_code`) kaldırıldı; öğretmen-öğrenci ilişkisi ayrı bir tabloyla kuruldu | Uygulama sınıf değil **özel ders** modelinde çalışıyor; tek öğretmen hesabı var, sınıf/şube/kod karmaşıklığının karşılığı yok (kesin kural) |
+| 14 | AI/OCR entegrasyonu (OpenAI/Gemini, otomatik soru analizi) kalıcı olarak kapsam dışı — "MVP'de yok, sonra eklenir" değil | Ürün kararı: değerlendirme öğretmenin kendi teşhisiyle yapılır, otomasyon hedeflenmiyor (kesin kural) |
+| 15 | Öğretmen-öğrenci bağı `profiles.teacher_id` değil, ayrı `student_teacher` tablosu | Tek kolon bugün yeterli (tek öğretmen) ama öğrencinin gelecekte birden fazla öğretmenle çalışması (vekalet, grup dersi) `profiles`'ı bozmadan desteklenebilsin diye ayrı ilişki tablosu; RLS politikaları da `classes`'takiyle aynı iskeleti (security definer `is_teacher_of`) kullanmaya devam ediyor |
+| 16 | Öğrenci bağlama `join_code` yerine öğretmenin girdiği e-posta + `link_student_by_email` RPC | Öğrenci tarafında katılma adımı yok (öğretmen tek başına yönetiyor); RPC deseni `join_class_by_code`'un yerini alıyor — security definer ile `auth.users.email` araması RLS'i kontrollü şekilde genişletiyor |
 
 ---
 
 ## 7. Değişiklik Günlüğü
+- **2026-08-20** — v0.5: Öğretmen-öğrenci ilişki modeli netleşti: `profiles.teacher_id` fikri terk edildi, yerine ayrı **`student_teacher`** tablosu geldi (Karar #15) — `0005_student_teacher.sql` migration'ı `classes`/`class_members`/`questions.class_id`/`join_class_by_code`'u kaldırıp `student_teacher` + `link_student_by_email` RPC'sini ekledi (Karar #16). Kod tarafı buna göre yeniden yazıldı: `/ogretmen` artık öğrenci listesi + e-posta ile ekleme formu, `/ogretmen/ogrenci/[id]` yeni — kronolojik soru listesi + "En Çok Yanlış Yapılan Konular" tablosu. Sınıf ile ilgili tüm rota/komponent/action (`ClassOperations`, `TeacherFilterBar`, `class-actions.ts`) kaldırıldı. Faz 4 tamamlandı.
+- **2026-08-20** — v0.4: **Sınıf yapısı kaldırıldı** — `classes`/`class_members`/`join_code` silindi, yerine `profiles.teacher_id` ile doğrudan isim bazlı öğretmen-öğrenci ilişkisi geldi (Karar #13). **AI/OCR entegrasyonu kalıcı olarak kapsam dışı** (Karar #14). Öğretmen paneli planı (Faz 4) güncellendi: öğrenci listesi → öğrenci detayında kronolojik soru listesi + "En Çok Yanlış Yapılan Konular" tablosu (`GROUP BY konu ORDER BY toplam_yanlış DESC`). Ayrıca kayıt formu öğretmen rolüne kapatıldı (`signUpSchema.role` artık yalnız `"student"` kabul eder), tek öğretmen hesabı elle oluşturuldu.
 - **2026-08-18** — v0.3: Supabase projesi canlı, migration'lar çalıştırıldı, `/saglik` tamamen yeşil. `database.ts` şemayla elle doğrulandı. `scripts/seed-curriculum.ts` yazıldı (9. sınıf örnek, 10–12 TODO).
 - **2026-08-17** — v0.2: Faz 1 kod tarafı tamamlandı. Next 15 → 16 (güvenlik), `middleware.ts` → `proxy.ts`, 3 migration + auth akışı yazıldı. Kararlar 8–12 eklendi.
 - **2026-08-17** — v0.1: İlk beyin dosyası. Faz 0 tamamlandı, Faz 1 onay bekliyor.

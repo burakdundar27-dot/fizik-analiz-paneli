@@ -1,5 +1,5 @@
 /**
- * supabase/migrations/0001_init.sql şemasıyla elle doğrulanmıştır (alan alan eşleşir).
+ * supabase/migrations/0001_init.sql + 0005_student_teacher.sql şemasıyla elle doğrulanmıştır (alan alan eşleşir).
  * `npx supabase gen types` interaktif login gerektirdiğinden (headless ortamda
  * mümkün değil) buradan üretilemedi; istenirse şu komutla üretilip bu dosyanın
  * yerine konabilir — çıktı aynı şekli üretmelidir:
@@ -17,20 +17,16 @@ export type Profile = {
   created_at: string;
 };
 
-export type Class = {
+export type StudentTeacher = {
   id: string;
-  name: string;
   teacher_id: string;
-  join_code: string;
-  grade_level: number | null;
-  is_active: boolean;
+  student_id: string;
   created_at: string;
 };
 
 export type Question = {
   id: string;
   student_id: string;
-  class_id: string | null;
   sub_outcome_id: string;
   image_path: string;
   error_reason: ErrorReason;
@@ -58,8 +54,7 @@ export type Database = {
   public: {
     Tables: {
       profiles: Table<Profile, Omit<Profile, "created_at">>;
-      classes: Table<Class, Omit<Class, "id" | "created_at">>;
-      class_members: Table<{ id: string; class_id: string; student_id: string; joined_at: string }>;
+      student_teacher: Table<StudentTeacher, Omit<StudentTeacher, "id" | "created_at">>;
       units: Table<Ref & { grade_level: number }>;
       topics: Table<Ref & { unit_id: string }>;
       outcomes: Table<Ref & { topic_id: string }>;
@@ -71,9 +66,9 @@ export type Database = {
     };
     Views: Record<never, never>;
     Functions: {
-      join_class_by_code: {
-        Args: { p_join_code: string };
-        Returns: { class_id: string; class_name: string }[];
+      link_student_by_email: {
+        Args: { p_email: string };
+        Returns: { student_id: string; full_name: string }[];
       };
     };
     Enums: {
