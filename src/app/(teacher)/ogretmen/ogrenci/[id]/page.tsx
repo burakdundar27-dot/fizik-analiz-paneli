@@ -50,7 +50,13 @@ async function getStudentQuestions(studentId: string) {
     subOutcomeIds.length
       ? supabase.from("sub_outcomes").select("id,code").in("id", subOutcomeIds)
       : Promise.resolve({ data: [] }),
-    Promise.all(questions.map((q) => supabase.storage.from(STORAGE_BUCKET).createSignedUrl(q.image_path, 600))),
+    Promise.all(
+      questions.map((q) =>
+        supabase.storage.from(STORAGE_BUCKET).createSignedUrl(q.image_path, 600, {
+          transform: { width: 800, quality: 80 },
+        })
+      )
+    ),
   ]);
   const codeById = new Map((subOutcomes ?? []).map((s) => [s.id, s.code]));
 

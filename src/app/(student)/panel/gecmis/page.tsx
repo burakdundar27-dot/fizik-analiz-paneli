@@ -55,7 +55,11 @@ export default async function GecmisPage() {
   }
 
   const signedUrls = await Promise.all(
-    questions.map((q) => supabase.storage.from(STORAGE_BUCKET).createSignedUrl(q.image_path, 3600))
+    questions.map((q) =>
+      supabase.storage.from(STORAGE_BUCKET).createSignedUrl(q.image_path, 3600, {
+        transform: { width: 800, quality: 80 },
+      })
+    )
   );
 
   return (

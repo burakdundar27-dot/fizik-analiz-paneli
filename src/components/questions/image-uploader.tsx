@@ -167,7 +167,7 @@ export function ImageUploader({ onFileReady, onClear, disabled, previewUrl }: Im
                 aria-hidden="true"
               />
               <p className="text-sm">Fotoğraf sürükle ya da seç</p>
-              <p className="text-xs text-muted-foreground">JPEG, PNG, WEBP, HEIC · en fazla 2MB</p>
+              <p className="text-xs text-muted-foreground">JPEG, PNG, WEBP, HEIC · otomatik sıkıştırılır (≤500KB)</p>
             </>
           )}
         </div>

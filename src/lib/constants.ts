@@ -121,7 +121,7 @@ export const HOME_BY_ROLE: Record<UserRole, string> = {
 export const IMAGE_RULES = {
   maxEdge: 1600,
   quality: 0.8,
-  maxBytes: 2 * 1024 * 1024,
+  maxBytes: 500 * 1024,
   accept: ["image/jpeg", "image/png", "image/webp", "image/heic"],
 } as const;
 
