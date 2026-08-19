@@ -4,7 +4,7 @@
 > Her yeni oturumda Claude önce bu dosyayı okur, sonra kod yazar.
 > Kod ile bu dosya çelişirse **bu dosya kazanır**; kod düzeltilir veya dosya bilinçli olarak güncellenir.
 
-**Sürüm:** 0.5 · **Son güncelleme:** 2026-08-20 · **Durum:** Faz 1 ve Faz 4 tamam — sınıf yapısı `student_teacher` ilişki tablosuyla değiştirildi, Faz 2 (seed/manuel test) hâlâ açık
+**Sürüm:** 0.6 · **Son güncelleme:** 2026-08-20 · **Durum:** Faz 1 ve Faz 4 tamam — sınıf yapısı `student_teacher` ilişki tablosuyla değiştirildi, Faz 2 (seed/manuel test) hâlâ açık; Faz 4.1 (Aylık Gelişim Raporu PDF) ve `review_status` iş akışı alanı planlandı, henüz kod yazılmadı
 
 ---
 
@@ -135,13 +135,16 @@ Hepsinde ortak: `id` uuid PK, `code` text UNIQUE, `title` text NOT NULL, `order_
 | `sub_outcome_id` | `uuid` NOT NULL | → sub_outcomes RESTRICT |
 | `image_path` | `text` NOT NULL | Storage yolu: `{student_id}/{uuid}.webp` — **tam URL değil** |
 | `error_reason` | `error_reason` NOT NULL | enum, aşağıda |
-| `status` | `question_status` NOT NULL | enum, default `'review_needed'` |
+| `status` | `question_status` NOT NULL | enum, default `'review_needed'` — **öğrencinin kendi değerlendirmesi** (soruyu nasıl çözdüğü), aşağıda §3.5 |
+| `review_status` | `question_review_status` NOT NULL | enum, default `'review_needed'` — **öğretmenin soruyu ele alma durumu** (workflow), aşağıda §3.5 |
 | `source` | `text` | "TYT 2024", "Ders kitabı s.112", serbest metin |
 | `student_note` | `text` | Öğrencinin kendi yorumu |
 | `teacher_note` | `text` | Öğretmen geri bildirimi (sadece teacher yazar) |
 | `is_resolved` | `boolean` | default `false` — öğrenci "artık anladım" der |
 | `solved_at` | `timestamptz` | `is_resolved` true olunca set edilir |
 | `created_at` / `updated_at` | `timestamptz` | `updated_at` trigger ile |
+
+> `review_status`, `status` ile **karıştırılmamalı**: `status` öğrencinin soruyu ilk çözerken kendi hakkındaki notu (yanlış yaptım / boş bıraktım / ...), `review_status` ise öğretmenin bu kaydı derste ele alıp almadığını izleyen ayrı bir iş akışı alanıdır. `is_resolved`/`solved_at` öğrencinin kendi "artık anladım" işaretidir — `review_status = 'resolved'` öğretmen tarafında ayrı bir onaydır, ikisi otomatik senkron değildir. Henüz migration yazılmadı; §5 Faz 4.1'e bkz.
 
 ### 3.5 Enum'lar
 ```sql
@@ -162,10 +165,24 @@ create type question_status as enum (
   'wrong',              -- Yanlış yaptı
   'blank',              -- Boş bıraktı
   'lucky_guess',        -- Doğru ama emin değildi
-  'review_needed'       -- Tekrar edilecek
+  'review_needed'       -- Tekrar edilecek (öğrencinin kendi notu)
+);
+
+create type question_review_status as enum (
+  'review_needed',      -- 🔴 Derste bakılacak (varsayılan — yeni yüklenen)
+  'needs_revision',     -- 🟡 Tekrar edilecek (öğretmen anlattı, ödev verdi)
+  'resolved'             -- 🟢 Tamamlandı / Anlaşıldı (konu oturdu)
 );
 ```
+
+| `question_review_status` değeri | Rozet | Türkçe etiket | Ne zaman |
+|---|---|---|---|
+| `review_needed` | 🔴 | Derste Bakılacak | Varsayılan — soru yeni yüklendiğinde |
+| `needs_revision` | 🟡 | Tekrar Edilecek | Öğretmen konuyu anlattı, ödev/tekrar verdi ama henüz oturmadı |
+| `resolved` | 🟢 | Tamamlandı / Anlaşıldı | Konu oturdu, öğretmen kapattı |
+
 > ⚠️ Enum değerleri **kodda İngilizce**, arayüzde Türkçe. Eşleme `src/lib/constants.ts` içinde tek yerde tutulur. Yeni değer eklemek migration gerektirir — enum'a değer eklemek kolay, **çıkarmak zordur**; kararlı tut.
+> ⚠️ **Ad çakışması dikkat:** `question_status.review_needed` (öğrencinin "buna tekrar dönmem gerek" kendi notu, `status` kolonu) ile `question_review_status.review_needed` (öğretmenin henüz bakmadığı sorular için varsayılan iş akışı durumu, `review_status` kolonu) **aynı etiketi taşır ama iki ayrı enum tipine ait, anlamları farklıdır** — kod tarafında hangi kolondan geldiği (`status` vs `review_status`) üzerinden ayırt edilir, isim benzerliğine güvenilmez.
 
 ### 3.6 İndeksler
 ```sql
@@ -273,6 +290,10 @@ Ayrıca **Faz 2'nin SQL ve auth kısmı da yazıldı**: 3 migration dosyası + g
 `/ogretmen`: e-posta ile öğrenci bağlama formu (`link_student_by_email` RPC) + `student_teacher`'da kendine bağlı öğrenciler isim isim listelenir · `/ogretmen/ogrenci/[id]`: yalnız o öğrencinin sorusu fotoğrafları kronolojik listede, **"En Çok Yanlış Yapılan Konular"** tablosu (sunucuda `sub_outcome → outcome → topic` zincirinden aggregate edilip azalan sırada) · soru detay drawer'ı + `teacher_note` yazma.
 **Bitti:** öğretmen bir öğrenciyi e-postayla ekliyor, listeden seçip tüm sorularını kronolojik görüyor, en çok yanlış yaptığı konuları sıralı tablo olarak görüyor.
 
+### Faz 4.1 — 📋 Planlandı: Aylık Gelişim Raporu (PDF)
+Öğrenci detay sayfasına (`/ogretmen/ogrenci/[id]`) **"Aylık Gelişim Raporu Al (PDF)"** butonu eklenecek. Rapor, sayfada zaten var olan periyot filtresiyle aynı veriden — `getStudentWeakTopics()` / `computeStats()` tarzı aggregate'lerden (Genel + Bu Ay/Son 30 Gün tabloları) — sunucu tarafında üretilir: toplam kayıt, hata nedeni dağılımı, en çok yanlış yapılan konular tek PDF çıktısına dönüşür.
+**Henüz kod yazılmadı:** PDF üretim kütüphanesi (sunucu tarafında üretim — örn. `@react-pdf/renderer`), buton yerleşimi ve dosya adlandırması sonraki oturumda kararlaştırılacak.
+
 ### Faz 5 — Analiz
 Özet kartlar (toplam kayıt, en sık hata nedeni, en zayıf ünite, çözüme kavuşma oranı) · hata nedeni dağılımı (bar) · ünite bazlı ısı haritası · zaman serisi (haftalık trend) · öğrenci karşılaştırma tablosu · CSV dışa aktarım.
 **Bitti sayılır:** öğretmen tek ekranda tüm öğrencilerinin (toplu) en zayıf 3 alt kazanımını görüyor.
@@ -302,10 +323,12 @@ Boş/hata durumlarının cilalanması · performans (görsel lazy-load, signed U
 | 14 | AI/OCR entegrasyonu (OpenAI/Gemini, otomatik soru analizi) kalıcı olarak kapsam dışı — "MVP'de yok, sonra eklenir" değil | Ürün kararı: değerlendirme öğretmenin kendi teşhisiyle yapılır, otomasyon hedeflenmiyor (kesin kural) |
 | 15 | Öğretmen-öğrenci bağı `profiles.teacher_id` değil, ayrı `student_teacher` tablosu | Tek kolon bugün yeterli (tek öğretmen) ama öğrencinin gelecekte birden fazla öğretmenle çalışması (vekalet, grup dersi) `profiles`'ı bozmadan desteklenebilsin diye ayrı ilişki tablosu; RLS politikaları da `classes`'takiyle aynı iskeleti (security definer `is_teacher_of`) kullanmaya devam ediyor |
 | 16 | Öğrenci bağlama `join_code` yerine öğretmenin girdiği e-posta + `link_student_by_email` RPC | Öğrenci tarafında katılma adımı yok (öğretmen tek başına yönetiyor); RPC deseni `join_class_by_code`'un yerini alıyor — security definer ile `auth.users.email` araması RLS'i kontrollü şekilde genişletiyor |
+| 17 | Öğretmen iş akışı durumu ayrı `review_status` kolonu/`question_review_status` enum'unda tutulur, mevcut `status` kolonuna değer eklenmedi | `status` zaten öğrencinin kendi değerlendirmesi için kullanılıyor ve içinde `review_needed` değeri var; aynı kolona öğretmen-taraflı farklı bir `review_needed` anlamı eklemek anlam çakışması yaratırdı — iki farklı bakış açısı (öğrenci ilk giriş / öğretmen sonradan takip) iki ayrı kolonla net kalır |
 
 ---
 
 ## 7. Değişiklik Günlüğü
+- **2026-08-20** — v0.6: Öğretmen tarafı soru iş akışı durumu (`review_status` / `question_review_status` enum: `review_needed` 🔴 / `needs_revision` 🟡 / `resolved` 🟢) şema olarak tanımlandı (§3.4, §3.5, Karar #17) — mevcut `status` kolonundaki `review_needed` değeriyle isim çakışmasına dikkat çekildi, henüz migration/kod yazılmadı. Öğrenci detay sayfasına "Aylık Gelişim Raporu Al (PDF)" özelliği Faz 4.1 olarak plana eklendi (§5) — henüz kod yazılmadı.
 - **2026-08-20** — v0.5: Öğretmen-öğrenci ilişki modeli netleşti: `profiles.teacher_id` fikri terk edildi, yerine ayrı **`student_teacher`** tablosu geldi (Karar #15) — `0005_student_teacher.sql` migration'ı `classes`/`class_members`/`questions.class_id`/`join_class_by_code`'u kaldırıp `student_teacher` + `link_student_by_email` RPC'sini ekledi (Karar #16). Kod tarafı buna göre yeniden yazıldı: `/ogretmen` artık öğrenci listesi + e-posta ile ekleme formu, `/ogretmen/ogrenci/[id]` yeni — kronolojik soru listesi + "En Çok Yanlış Yapılan Konular" tablosu. Sınıf ile ilgili tüm rota/komponent/action (`ClassOperations`, `TeacherFilterBar`, `class-actions.ts`) kaldırıldı. Faz 4 tamamlandı.
 - **2026-08-20** — v0.4: **Sınıf yapısı kaldırıldı** — `classes`/`class_members`/`join_code` silindi, yerine `profiles.teacher_id` ile doğrudan isim bazlı öğretmen-öğrenci ilişkisi geldi (Karar #13). **AI/OCR entegrasyonu kalıcı olarak kapsam dışı** (Karar #14). Öğretmen paneli planı (Faz 4) güncellendi: öğrenci listesi → öğrenci detayında kronolojik soru listesi + "En Çok Yanlış Yapılan Konular" tablosu (`GROUP BY konu ORDER BY toplam_yanlış DESC`). Ayrıca kayıt formu öğretmen rolüne kapatıldı (`signUpSchema.role` artık yalnız `"student"` kabul eder), tek öğretmen hesabı elle oluşturuldu.
 - **2026-08-18** — v0.3: Supabase projesi canlı, migration'lar çalıştırıldı, `/saglik` tamamen yeşil. `database.ts` şemayla elle doğrulandı. `scripts/seed-curriculum.ts` yazıldı (9. sınıf örnek, 10–12 TODO).
