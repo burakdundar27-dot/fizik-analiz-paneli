@@ -1,6 +1,13 @@
 import Image from "next/image";
 import { Card, Badge } from "@/components/ui/card";
-import { ERROR_REASONS, QUESTION_STATUSES, type ErrorReason, type QuestionStatus } from "@/lib/constants";
+import {
+  ERROR_REASONS,
+  QUESTION_STATUSES,
+  QUESTION_REVIEW_STATUSES,
+  type ErrorReason,
+  type QuestionStatus,
+  type QuestionReviewStatus,
+} from "@/lib/constants";
 
 export type QuestionCardProps = {
   imageUrl: string | null;
@@ -8,11 +15,13 @@ export type QuestionCardProps = {
   createdAt: string;
   errorReason: ErrorReason;
   status: QuestionStatus;
+  reviewStatus: QuestionReviewStatus;
 };
 
-export function QuestionCard({ imageUrl, title, createdAt, errorReason, status }: QuestionCardProps) {
+export function QuestionCard({ imageUrl, title, createdAt, errorReason, status, reviewStatus }: QuestionCardProps) {
   const errorMeta = ERROR_REASONS[errorReason];
   const statusMeta = QUESTION_STATUSES[status];
+  const reviewMeta = QUESTION_REVIEW_STATUSES[reviewStatus];
 
   return (
     <Card className="overflow-hidden p-0">
@@ -32,6 +41,9 @@ export function QuestionCard({ imageUrl, title, createdAt, errorReason, status }
           {new Date(createdAt).toLocaleDateString("tr-TR", { day: "numeric", month: "long", year: "numeric" })}
         </p>
         <div className="flex flex-wrap gap-1.5">
+          <Badge className={reviewMeta.className}>
+            {reviewMeta.emoji} {reviewMeta.label}
+          </Badge>
           <Badge className={errorMeta.className}>{errorMeta.short}</Badge>
           <Badge className={statusMeta.className}>{statusMeta.label}</Badge>
         </div>

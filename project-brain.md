@@ -4,7 +4,7 @@
 > Her yeni oturumda Claude önce bu dosyayı okur, sonra kod yazar.
 > Kod ile bu dosya çelişirse **bu dosya kazanır**; kod düzeltilir veya dosya bilinçli olarak güncellenir.
 
-**Sürüm:** 0.6 · **Son güncelleme:** 2026-08-20 · **Durum:** Faz 1 ve Faz 4 tamam — sınıf yapısı `student_teacher` ilişki tablosuyla değiştirildi, Faz 2 (seed/manuel test) hâlâ açık; Faz 4.1 (Aylık Gelişim Raporu PDF) ve `review_status` iş akışı alanı planlandı, henüz kod yazılmadı
+**Sürüm:** 0.7 · **Son güncelleme:** 2026-08-20 · **Durum:** Faz 1, Faz 4 ve Faz 4.1 tamam — sınıf yapısı `student_teacher` ilişki tablosuyla değiştirildi, `review_status` iş akışı + Aylık Gelişim Raporu (PDF) koda geçti ve `0006_review_status.sql` canlı Supabase'e uygulandı, Faz 2 (seed/manuel test) hâlâ açık
 
 ---
 
@@ -144,7 +144,7 @@ Hepsinde ortak: `id` uuid PK, `code` text UNIQUE, `title` text NOT NULL, `order_
 | `solved_at` | `timestamptz` | `is_resolved` true olunca set edilir |
 | `created_at` / `updated_at` | `timestamptz` | `updated_at` trigger ile |
 
-> `review_status`, `status` ile **karıştırılmamalı**: `status` öğrencinin soruyu ilk çözerken kendi hakkındaki notu (yanlış yaptım / boş bıraktım / ...), `review_status` ise öğretmenin bu kaydı derste ele alıp almadığını izleyen ayrı bir iş akışı alanıdır. `is_resolved`/`solved_at` öğrencinin kendi "artık anladım" işaretidir — `review_status = 'resolved'` öğretmen tarafında ayrı bir onaydır, ikisi otomatik senkron değildir. Henüz migration yazılmadı; §5 Faz 4.1'e bkz.
+> `review_status`, `status` ile **karıştırılmamalı**: `status` öğrencinin soruyu ilk çözerken kendi hakkındaki notu (yanlış yaptım / boş bıraktım / ...), `review_status` ise öğretmenin bu kaydı derste ele alıp almadığını izleyen ayrı bir iş akışı alanıdır. `is_resolved`/`solved_at` öğrencinin kendi "artık anladım" işaretidir — `review_status = 'resolved'` öğretmen tarafında ayrı bir onaydır, ikisi otomatik senkron değildir. `0006_review_status.sql` ile eklendi (§5 Faz 4.1 ✅).
 
 ### 3.5 Enum'lar
 ```sql
@@ -205,7 +205,7 @@ create index on student_teacher (student_id);
 - `questions`:
   - `SELECT`: `student_id = auth.uid()` **VEYA** kaydın sahibi öğrencinin `student_teacher`'da bu öğretmene bağlı olması (`is_teacher_of`).
   - `INSERT`: yalnız `student_id = auth.uid()`.
-  - `UPDATE`: öğrenci kendi kaydını (`teacher_note` HARİÇ); öğretmen yalnız `teacher_note`.
+  - `UPDATE`: öğrenci kendi kaydını (`teacher_note`/`review_status` HARİÇ); öğretmen yalnız `teacher_note` ve `review_status`.
   - `DELETE`: yalnız kaydın sahibi öğrenci.
 - **Storage `question-images`**: private bucket. Yükleme yolu `{auth.uid()}/...` ile başlamak zorunda. Okuma: sahibi + `student_teacher` ile bağlı öğretmen. Görsel `createSignedUrl` ile gösterilir.
 
@@ -290,9 +290,10 @@ Ayrıca **Faz 2'nin SQL ve auth kısmı da yazıldı**: 3 migration dosyası + g
 `/ogretmen`: e-posta ile öğrenci bağlama formu (`link_student_by_email` RPC) + `student_teacher`'da kendine bağlı öğrenciler isim isim listelenir · `/ogretmen/ogrenci/[id]`: yalnız o öğrencinin sorusu fotoğrafları kronolojik listede, **"En Çok Yanlış Yapılan Konular"** tablosu (sunucuda `sub_outcome → outcome → topic` zincirinden aggregate edilip azalan sırada) · soru detay drawer'ı + `teacher_note` yazma.
 **Bitti:** öğretmen bir öğrenciyi e-postayla ekliyor, listeden seçip tüm sorularını kronolojik görüyor, en çok yanlış yaptığı konuları sıralı tablo olarak görüyor.
 
-### Faz 4.1 — 📋 Planlandı: Aylık Gelişim Raporu (PDF)
-Öğrenci detay sayfasına (`/ogretmen/ogrenci/[id]`) **"Aylık Gelişim Raporu Al (PDF)"** butonu eklenecek. Rapor, sayfada zaten var olan periyot filtresiyle aynı veriden — `getStudentWeakTopics()` / `computeStats()` tarzı aggregate'lerden (Genel + Bu Ay/Son 30 Gün tabloları) — sunucu tarafında üretilir: toplam kayıt, hata nedeni dağılımı, en çok yanlış yapılan konular tek PDF çıktısına dönüşür.
-**Henüz kod yazılmadı:** PDF üretim kütüphanesi (sunucu tarafında üretim — örn. `@react-pdf/renderer`), buton yerleşimi ve dosya adlandırması sonraki oturumda kararlaştırılacak.
+### Faz 4.1 — ✅ *tamamlandı*: Öğretmen iş akışı durumu + Aylık Gelişim Raporu (PDF)
+`review_status` (🔴/🟡/🟢) `questions` tablosuna eklendi (`0006_review_status.sql`) — `QuestionCard`'da rozet olarak gösteriliyor, öğretmen `QuestionDetailDrawer`'daki tek-tıkla buton setiyle (`setReviewStatus` Server Action) değiştiriyor, `guard_question_columns()` trigger'ı öğrencinin bu alanı değiştirmesini engelliyor.
+Öğrenci detay sayfasına (`/ogretmen/ogrenci/[id]`) **"Aylık Gelişim Raporu Al (PDF)"** butonu eklendi: istemci tarafında `jsPDF` ile (`src/lib/monthly-report-pdf.ts`, dinamik `import()` ile code-split) son 30 günün kaydı, en çok yanlış yapılan ilk 3 konu ve hata nedeni dağılımını zinc/indigo temalı tek sayfalık bir PDF'e dönüştürüyor; veri sunucu bileşeninde zaten yüklü `questions`/`getStudentWeakTopics()` çıktısından türetiliyor, ekstra sorgu yok.
+**Bitti:** öğretmen bir soruyu 🔴/🟡/🟢 olarak işaretleyebiliyor, öğrenci detay sayfasından tek tıkla PDF rapor indirebiliyor.
 
 ### Faz 5 — Analiz
 Özet kartlar (toplam kayıt, en sık hata nedeni, en zayıf ünite, çözüme kavuşma oranı) · hata nedeni dağılımı (bar) · ünite bazlı ısı haritası · zaman serisi (haftalık trend) · öğrenci karşılaştırma tablosu · CSV dışa aktarım.
@@ -328,6 +329,7 @@ Boş/hata durumlarının cilalanması · performans (görsel lazy-load, signed U
 ---
 
 ## 7. Değişiklik Günlüğü
+- **2026-08-20** — v0.7: Faz 4.1 koda geçirildi — `review_status` enum'u/kolonu (`0006_review_status.sql`), `QUESTION_REVIEW_STATUSES` rozet eşlemesi, `QuestionCard`'da 🔴/🟡/🟢 rozeti, öğretmen drawer'ında tek-tıkla durum değiştirme (`setReviewStatus` action), `guard_question_columns()` trigger'ında öğrenci-koruması. Öğrenci detay sayfasına `jsPDF` ile istemci taraflı "Aylık Gelişim Raporu Al (PDF)" butonu eklendi (`src/lib/monthly-report-pdf.ts`, `MonthlyReportButton.tsx`). `npm run build` hatasız. `0006_review_status.sql` kullanıcı onayıyla canlı Supabase veritabanına uygulandı (`supabase db push`).
 - **2026-08-20** — v0.6: Öğretmen tarafı soru iş akışı durumu (`review_status` / `question_review_status` enum: `review_needed` 🔴 / `needs_revision` 🟡 / `resolved` 🟢) şema olarak tanımlandı (§3.4, §3.5, Karar #17) — mevcut `status` kolonundaki `review_needed` değeriyle isim çakışmasına dikkat çekildi, henüz migration/kod yazılmadı. Öğrenci detay sayfasına "Aylık Gelişim Raporu Al (PDF)" özelliği Faz 4.1 olarak plana eklendi (§5) — henüz kod yazılmadı.
 - **2026-08-20** — v0.5: Öğretmen-öğrenci ilişki modeli netleşti: `profiles.teacher_id` fikri terk edildi, yerine ayrı **`student_teacher`** tablosu geldi (Karar #15) — `0005_student_teacher.sql` migration'ı `classes`/`class_members`/`questions.class_id`/`join_class_by_code`'u kaldırıp `student_teacher` + `link_student_by_email` RPC'sini ekledi (Karar #16). Kod tarafı buna göre yeniden yazıldı: `/ogretmen` artık öğrenci listesi + e-posta ile ekleme formu, `/ogretmen/ogrenci/[id]` yeni — kronolojik soru listesi + "En Çok Yanlış Yapılan Konular" tablosu. Sınıf ile ilgili tüm rota/komponent/action (`ClassOperations`, `TeacherFilterBar`, `class-actions.ts`) kaldırıldı. Faz 4 tamamlandı.
 - **2026-08-20** — v0.4: **Sınıf yapısı kaldırıldı** — `classes`/`class_members`/`join_code` silindi, yerine `profiles.teacher_id` ile doğrudan isim bazlı öğretmen-öğrenci ilişkisi geldi (Karar #13). **AI/OCR entegrasyonu kalıcı olarak kapsam dışı** (Karar #14). Öğretmen paneli planı (Faz 4) güncellendi: öğrenci listesi → öğrenci detayında kronolojik soru listesi + "En Çok Yanlış Yapılan Konular" tablosu (`GROUP BY konu ORDER BY toplam_yanlış DESC`). Ayrıca kayıt formu öğretmen rolüne kapatıldı (`signUpSchema.role` artık yalnız `"student"` kabul eder), tek öğretmen hesabı elle oluşturuldu.

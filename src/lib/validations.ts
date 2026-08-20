@@ -69,3 +69,12 @@ export const updateQuestionFeedbackSchema = z.object({
 });
 
 export type UpdateQuestionFeedbackInput = z.infer<typeof updateQuestionFeedbackSchema>;
+
+export const updateReviewStatusSchema = z.object({
+  questionId: z.string().min(1, "Soru bulunamadı"),
+  reviewStatus: z.enum(["review_needed", "needs_revision", "resolved"], {
+    message: "Geçersiz durum",
+  }),
+});
+
+export type UpdateReviewStatusInput = z.infer<typeof updateReviewStatusSchema>;

@@ -14,6 +14,7 @@ export type ErrorReason =
   | "time_pressure";
 
 export type QuestionStatus = "wrong" | "blank" | "lucky_guess" | "review_needed";
+export type QuestionReviewStatus = "review_needed" | "needs_revision" | "resolved";
 export type UserRole = "student" | "teacher";
 
 type Meta = { label: string; short: string; className: string; hint: string };
@@ -103,6 +104,27 @@ export const QUESTION_STATUSES: Record<QuestionStatus, Omit<Meta, "short">> = {
     hint: "Bu soruya tekrar dönmem gerek",
   },
 };
+
+/** Öğretmen iş akışı durumu (brain §3.5, Karar #17) — question_status.review_needed ile AYNI etiket ama farklı enum/anlam, karıştırılmasın. */
+export const QUESTION_REVIEW_STATUSES: Record<QuestionReviewStatus, { emoji: string; label: string; className: string }> = {
+  review_needed: {
+    emoji: "🔴",
+    label: "Derste Bakılacak",
+    className: "bg-red-50 text-red-700 border-red-200",
+  },
+  needs_revision: {
+    emoji: "🟡",
+    label: "Tekrar Edilecek",
+    className: "bg-amber-50 text-amber-700 border-amber-200",
+  },
+  resolved: {
+    emoji: "🟢",
+    label: "Tamamlandı",
+    className: "bg-emerald-50 text-emerald-700 border-emerald-200",
+  },
+};
+
+export const QUESTION_REVIEW_STATUS_ORDER: QuestionReviewStatus[] = ["review_needed", "needs_revision", "resolved"];
 
 export const USER_ROLES: Record<UserRole, string> = {
   student: "Öğrenci",

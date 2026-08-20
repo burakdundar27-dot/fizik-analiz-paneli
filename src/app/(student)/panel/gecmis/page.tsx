@@ -76,6 +76,7 @@ export default async function GecmisPage() {
             createdAt={question.created_at}
             errorReason={question.error_reason}
             status={question.status}
+            reviewStatus={question.review_status}
           />
         );
       })}

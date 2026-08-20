@@ -1,11 +1,11 @@
 /**
- * supabase/migrations/0001_init.sql + 0005_student_teacher.sql şemasıyla elle doğrulanmıştır (alan alan eşleşir).
+ * supabase/migrations/0001_init.sql + 0005_student_teacher.sql + 0006_review_status.sql şemasıyla elle doğrulanmıştır (alan alan eşleşir).
  * `npx supabase gen types` interaktif login gerektirdiğinden (headless ortamda
  * mümkün değil) buradan üretilemedi; istenirse şu komutla üretilip bu dosyanın
  * yerine konabilir — çıktı aynı şekli üretmelidir:
  *   npx supabase login && npx supabase gen types typescript --project-id lppwjmmfufopkqlcqvyt > src/types/database.ts
  */
-import type { ErrorReason, QuestionStatus, UserRole } from "@/lib/constants";
+import type { ErrorReason, QuestionReviewStatus, QuestionStatus, UserRole } from "@/lib/constants";
 
 type Ref = { id: string; code: string; title: string; order_no: number | null; created_at: string };
 
@@ -31,6 +31,7 @@ export type Question = {
   image_path: string;
   error_reason: ErrorReason;
   status: QuestionStatus;
+  review_status: QuestionReviewStatus;
   source: string | null;
   student_note: string | null;
   teacher_note: string | null;
@@ -61,7 +62,7 @@ export type Database = {
       sub_outcomes: Table<Ref & { outcome_id: string }>;
       questions: Table<
         Question,
-        Omit<Question, "id" | "created_at" | "updated_at" | "solved_at" | "teacher_note">
+        Omit<Question, "id" | "created_at" | "updated_at" | "solved_at" | "teacher_note" | "review_status">
       >;
     };
     Views: Record<never, never>;
@@ -75,6 +76,7 @@ export type Database = {
       user_role: UserRole;
       error_reason: ErrorReason;
       question_status: QuestionStatus;
+      question_review_status: QuestionReviewStatus;
     };
     CompositeTypes: Record<never, never>;
   };

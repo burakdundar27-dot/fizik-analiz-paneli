@@ -5,8 +5,12 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { getCurrentUser, createClient } from "@/lib/supabase/server";
 import { getStudentWeakTopics } from "@/lib/actions/analysis-actions";
 import { TeacherQuestionCard } from "@/components/teacher/QuestionDetailDrawer";
-import { STORAGE_BUCKET } from "@/lib/constants";
+import { MonthlyReportButton } from "@/components/teacher/MonthlyReportButton";
+import { STORAGE_BUCKET, ERROR_REASONS, asList } from "@/lib/constants";
+import type { MonthlyReportData } from "@/lib/monthly-report-pdf";
 import { cn } from "@/lib/utils";
+
+const MONTH_MS = 30 * 24 * 60 * 60 * 1000;
 
 export const metadata = { title: "Öğrenci Detayı — Fizik Analiz Paneli" };
 
@@ -84,19 +88,37 @@ export default async function StudentDetailPage({
   ]);
   if (!user || !student) notFound();
 
-  const [questions, weakTopics] = await Promise.all([
+  const [questions, weakTopics, monthlyTopics] = await Promise.all([
     getStudentQuestions(student.id),
     getStudentWeakTopics(student.id, period === "month" ? 30 : undefined),
+    getStudentWeakTopics(student.id, 30),
   ]);
+
+  const monthSince = Date.now() - MONTH_MS;
+  const monthlyQuestions = questions.filter((q) => new Date(q.created_at).getTime() >= monthSince);
+  const reportData: MonthlyReportData = {
+    studentName: student.full_name,
+    monthlyCount: monthlyQuestions.length,
+    rangeStart: new Date(monthSince).toLocaleDateString("tr-TR"),
+    rangeEnd: new Date().toLocaleDateString("tr-TR"),
+    topTopics: monthlyTopics.slice(0, 3),
+    reasonCounts: asList(ERROR_REASONS).map(({ value }) => ({
+      reason: value,
+      count: monthlyQuestions.filter((q) => q.error_reason === value).length,
+    })),
+  };
 
   return (
     <div className="flex flex-col gap-4">
-      <div>
-        <h1 className="text-2xl font-semibold tracking-tight">{student.full_name}</h1>
-        <p className="text-sm text-muted-foreground">
-          {student.grade_level ? `${student.grade_level}. sınıf · ` : ""}
-          {questions.length} kayıt
-        </p>
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+        <div>
+          <h1 className="text-2xl font-semibold tracking-tight">{student.full_name}</h1>
+          <p className="text-sm text-muted-foreground">
+            {student.grade_level ? `${student.grade_level}. sınıf · ` : ""}
+            {questions.length} kayıt
+          </p>
+        </div>
+        <MonthlyReportButton data={reportData} />
       </div>
 
       <Card>
@@ -152,6 +174,7 @@ export default async function StudentDetailPage({
                   createdAt: q.created_at,
                   errorReason: q.error_reason,
                   status: q.status,
+                  reviewStatus: q.review_status,
                   studentNote: q.student_note,
                   teacherNote: q.teacher_note,
                 }}

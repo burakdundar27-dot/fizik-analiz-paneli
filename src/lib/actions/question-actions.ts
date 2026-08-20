@@ -3,7 +3,8 @@
 import { randomUUID } from "crypto";
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
-import { createQuestionSchema, updateQuestionFeedbackSchema } from "@/lib/validations";
+import { createQuestionSchema, updateQuestionFeedbackSchema, updateReviewStatusSchema } from "@/lib/validations";
+import type { QuestionReviewStatus } from "@/lib/constants";
 import { STORAGE_BUCKET } from "@/lib/constants";
 import type { TablesInsert } from "@/types/database";
 
@@ -85,4 +86,31 @@ export async function updateQuestionFeedback(_prev: ActionState, formData: FormD
   revalidatePath("/ogretmen");
   revalidatePath(`/ogretmen/ogrenci/${data[0].student_id}`);
   return { success: "Not kaydedildi." };
+}
+
+/** Öğretmenin soru durumunu (🔴/🟡/🟢) tek tıkla değiştirmesi — brain §3.4/§3.5, Karar #17. */
+export async function setReviewStatus(
+  questionId: string,
+  reviewStatus: QuestionReviewStatus
+): Promise<ActionState> {
+  const parsed = updateReviewStatusSchema.safeParse({ questionId, reviewStatus });
+  if (!parsed.success) return { error: firstError(parsed.error.issues) };
+
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) return { error: "Oturumun sona ermiş, tekrar giriş yap" };
+
+  const { data, error } = await supabase
+    .from("questions")
+    .update({ review_status: parsed.data.reviewStatus })
+    .eq("id", parsed.data.questionId)
+    .select("id,student_id");
+
+  if (error || !data || data.length === 0) return { error: "Durum güncellenemedi, tekrar dene" };
+
+  revalidatePath("/ogretmen");
+  revalidatePath(`/ogretmen/ogrenci/${data[0].student_id}`);
+  return { success: "Durum güncellendi." };
 }
